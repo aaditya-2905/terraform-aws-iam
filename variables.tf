@@ -28,4 +28,11 @@ variable "iam_config" {
     policy_arns = optional(list(string))
     tags        = optional(map(string))
   }))
+
+  validation {
+    condition = alltrue([
+      for k, v in var.iam_config : contains(["user", "role", "policy"], v.type)
+    ])
+    error_message = "The 'type' attribute in 'iam_config' must be one of: user, role, policy."
+  }
 }

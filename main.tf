@@ -4,7 +4,7 @@ module "role" {
 
   for_each = {
     for k, v in var.iam_config : k => v
-    if try(v.type, "") == "role"
+    if v.type == "role"
   }
 
   role_name          = try(each.value.role_name, each.key)
@@ -21,7 +21,7 @@ module "policy" {
 
   for_each = {
     for k, v in var.iam_config : k => v
-    if try(v.type, "") == "policy"
+    if v.type == "policy"
   }
 
   policy_name        = try(each.value.policy_name, each.key)
@@ -37,7 +37,7 @@ module "user" {
 
   for_each = {
     for k, v in var.iam_config : k => v
-    if try(v.type, "") == "user"
+    if v.type == "user"
   }
 
   user_name               = try(each.value.user_name, each.key)
@@ -49,20 +49,20 @@ module "user" {
   tags                    = try(each.value.tags, {})
 }
 
-# ATTACHMENT MODULE (FIXED)
+# ATTACHMENT MODULE
 module "attachment" {
   source = "./modules/attachment-module"
 
   for_each = {
     for k, v in var.iam_config : k => v
-    if length(try(v.policy_arns, [])) > 0
+    if length(try(v.policy_arns, [])) > 0 && contains(["role", "user"], v.type)
   }
 
   entity_type = each.value.type
 
   entity_name = (
-    each.value.type == "role" ? try(module.role[each.key].name, null) :
-    each.value.type == "user" ? try(module.user[each.key].name, null) :
+    each.value.type == "role" ? module.role[each.key].name :
+    each.value.type == "user" ? module.user[each.key].name :
     null
   )
 

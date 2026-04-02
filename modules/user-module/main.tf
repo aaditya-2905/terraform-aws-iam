@@ -1,7 +1,7 @@
 resource "aws_iam_user" "this" {
   name = var.user_name
 
-  path = var.user_path != null ? var.user_path : "/"
+  path = coalesce(var.user_path, "/")
 
   tags = merge(
     { Terraform = "true" },
