@@ -3,7 +3,7 @@ module "role" {
   source = "./modules/role-module"
 
   for_each = {
-    for k, v in var.iam_config : k => v
+    for k, v in local.iam_config : k => v
     if v.type == "role"
   }
 
@@ -20,7 +20,7 @@ module "policy" {
   source = "./modules/policy-module"
 
   for_each = {
-    for k, v in var.iam_config : k => v
+    for k, v in local.iam_config : k => v
     if v.type == "policy"
   }
 
@@ -36,7 +36,7 @@ module "user" {
   source = "./modules/user-module"
 
   for_each = {
-    for k, v in var.iam_config : k => v
+    for k, v in local.iam_config : k => v
     if v.type == "user"
   }
 
@@ -54,7 +54,7 @@ module "attachment" {
   source = "./modules/attachment-module"
 
   for_each = {
-    for k, v in var.iam_config : k => v
+    for k, v in local.iam_config : k => v
     if length(try(v.policy_arns, [])) > 0 && contains(["role", "user"], v.type)
   }
 
