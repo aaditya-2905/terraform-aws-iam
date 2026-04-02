@@ -49,21 +49,22 @@ module "user" {
   tags                    = try(each.value.tags, {})
 }
 
-# ATTACHMENT MODULE
+# ATTACHMENT MODULE (FIXED)
 module "attachment" {
   source = "./modules/attachment-module"
 
   for_each = {
     for k, v in var.iam_config : k => v
-    if try(v.policy_arns, []) != []
+    if length(try(v.policy_arns, [])) > 0
   }
 
   entity_type = each.value.type
+
   entity_name = (
-    each.value.type == "role" ? module.role[each.key].name :
-    each.value.type == "user" ? module.user[each.key].name :
+    each.value.type == "role" ? try(module.role[each.key].name, null) :
+    each.value.type == "user" ? try(module.user[each.key].name, null) :
     null
   )
 
-  policy_arns = each.value.policy_arns
+  policy_arns = try(each.value.policy_arns, [])
 }
