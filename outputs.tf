@@ -1,29 +1,28 @@
-output "roles" {
-  description = "Created IAM Roles"
-  value = {
-    for k, v in module.role : k => {
-      name = v.name
-      arn  = v.arn
-    }
-  }
-}
-
 output "users" {
-  description = "Created IAM Users"
-  value = {
-    for k, v in module.user : k => {
-      name = v.name
-      arn  = v.arn
-    }
-  }
+  description = "Map of created IAM users with their ARNs"
+  value       = module.iam.users
 }
 
+output "access_keys" {
+  description = "Access keys created for users (sensitive)"
+  value       = module.iam.access_keys
+  sensitive   = true
+}
+
+# Roles
+output "roles" {
+  description = "Map of created IAM roles with their ARNs"
+  value       = module.iam.roles
+}
+
+# Policies
 output "policies" {
-  description = "Created IAM Policies"
-  value = {
-    for k, v in module.policy : k => {
-      name = v.name
-      arn  = v.arn
-    }
-  }
+  description = "Map of created IAM policies with their ARNs"
+  value       = module.iam.policies
+}
+
+# Groups
+output "groups" {
+  description = "Map of created IAM groups with their ARNs"
+  value       = module.iam.groups
 }

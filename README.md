@@ -1,165 +1,354 @@
 # Terraform AWS IAM Wrapper Module
 
-A flexible, reusable, and dynamic Terraform module to manage AWS IAM resources using a single unified configuration.
-
-This module allows you to create and manage:
-
-* IAM Roles
-* IAM Users
-* IAM Policies
-* Policy Attachments
-
-All through one input variable: `iam_config`.
-
----
+A flexible, beginner-friendly Terraform module for managing AWS IAM resources. Create multiple users, roles, policies, and groups in a single configuration.
 
 ## 🚀 Features
 
-* Unified IAM configuration (`iam_config`)
-* Supports Roles, Users, and Policies
-* Dynamic resource creation using `for_each`
-* Policy attachment automation
-* Minimal required inputs
-* Clean and scalable architecture
-* Registry-ready module design
+* **Multi-Resource Support** - Create 2+ users, 4+ policies, 2+ roles, and groups in one call
+* **Simple Wrapper Pattern** - Clean, straightforward variable passing
+* **Explicit Variables** - Easy-to-understand structure (no complex maps)
+* **Policy Attachments** - Attach policies to multiple roles and users dynamically
+* **Group Management** - Create groups and add users to them
+* **Optional Resources** - Create only what you need
+* **Beginner-Friendly** - Easy to understand and extend
+* **Production-Ready** - Follows AWS and Terraform best practices
 
 ---
 
-## 📦 Usage
+## 📦 Quick Start: Multi-Resource Example
+
+Create 2 users, 2 roles, 4 policies with attachments and groups:
 
 ```hcl
 provider "aws" {
-  region = "ap-south-1"
+  region = "us-east-1"
 }
 
 module "iam" {
   source = "aaditya-2905/iam/aws"
 
-  iam_config = {
-    app_role = {
-      type = "role"
+  # ========== Create 2 Users ==========
+  users = {
+    "dev-user-1" = {
+      create_access_key   = true
+      create_login_profile = true
+    }
+    "dev-user-2" = {
+      create_access_key   = true
+    }
+  }
 
-      role_name = "app-role"
-
-      assume_role_policy = {
+  # ========== Create 2 Roles ==========
+  roles = {
+    "app-role" = {
+      assume_role_policy = jsonencode({
         Version = "2012-10-17"
         Statement = [{
           Effect = "Allow"
-          Principal = {
-            Service = "ec2.amazonaws.com"
-          }
+          Principal = { Service = "ec2.amazonaws.com" }
           Action = "sts:AssumeRole"
         }]
-      }
-
-      policy_arns = [
-        "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-      ]
+      })
+      description = "Role for EC2 instances"
     }
-
-    dev_user = {
-      type = "user"
-
-      user_name = "dev-user"
-      create_access_key = true
-
-      policy_arns = [
-        "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-      ]
-    }
-
-    custom_policy = {
-      type = "policy"
-
-      policy_name = "custom-s3-policy"
-
-      policy_json = {
+    "lambda-role" = {
+      assume_role_policy = jsonencode({
         Version = "2012-10-17"
         Statement = [{
           Effect = "Allow"
-          Action   = ["s3:ListBucket"]
-          Resource = "*"
+          Principal = { Service = "lambda.amazonaws.com" }
+          Action = "sts:AssumeRole"
         }]
-      }
+      })
+      description = "Role for Lambda functions"
     }
   }
+
+  # ========== Create 4 Policies ==========
+  policies = {
+    "s3-read-policy" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["s3:GetObject", "s3:ListBucket"]
+          Resource = "*"
+        }]
+      })
+    }
+    "s3-write-policy" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["s3:PutObject", "s3:DeleteObject"]
+          Resource = "*"
+        }]
+      })
+    }
+    "ec2-read-policy" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["ec2:DescribeInstances"]
+          Resource = "*"
+        }]
+      })
+    }
+    "lambda-execution-policy" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["logs:CreateLogGroup", "logs:PutLogEvents"]
+          Resource = "*"
+        }]
+      })
+    }
+  }
+
+  # ========== Create 1 Group ==========
+  groups = {
+    "developers" = {
+      path = "/development/"
+    }
+  }
+
+  # ========== Attach Policies to Roles & Users ==========
+  # Format: "role:role_name:policy_arn" or "user:user_name:policy_arn"
+  policy_attachments = [
+    "role:app-role:${aws_iam_policy.s3_read.arn}",
+    "role:lambda-role:${aws_iam_policy.lambda_exec.arn}",
+    "user:dev-user-1:${aws_iam_policy.s3_read.arn}",
+    "user:dev-user-2:${aws_iam_policy.s3_write.arn}",
+  ]
+
+  # ========== Add Users to Groups ==========
+  # Format: "group_name:user_name"
+  group_memberships = [
+    "developers:dev-user-1",
+    "developers:dev-user-2",
+  ]
+
+  tags = {
+    Project     = "my-app"
+    Environment = "development"
+  }
+}
+
+output "users" {
+  value = module.iam.users
+}
+
+output "roles" {
+  value = module.iam.roles
+}
+
+output "groups" {
+  value = module.iam.groups
 }
 ```
 
 ---
 
-## ⚙️ Input Variable
+## ⚙️ Input Variables
+```
 
-### `iam_config`
+## ⚙️ Input Variables
 
-A map defining IAM resources.
+### Multi-Resource Variables
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `users` | `map(object(...))` | `{}` | Map of IAM users to create |
+| `roles` | `map(object(...))` | `{}` | Map of IAM roles to create |
+| `policies` | `map(object(...))` | `{}` | Map of IAM policies to create |
+| `groups` | `map(object(...))` | `{}` | Map of IAM groups to create |
+| `policy_attachments` | `list(string)` | `[]` | Attach policies: `"role:role_name:arn"` or `"user:user_name:arn"` |
+| `group_memberships` | `list(string)` | `[]` | Add users to groups: `"group_name:user_name"` |
+| `tags` | `map(string)` | `{}` | Tags to apply to all resources |
+
+### User Object Structure
 
 ```hcl
-iam_config = {
-  <resource_key> = {
-    type = "role" | "user" | "policy"
-
-    # Role specific
-    role_name
-    assume_role_policy
-    role_description
-    role_path
-
-    # User specific
-    user_name
-    user_path
-    create_login_profile
-    create_access_key
-
-    # Policy specific
-    policy_name
-    policy_json
-    policy_description
-    policy_path
-
-    # Common
-    policy_arns
-    tags
+users = {
+  "user_name" = {
+    path                    = optional(string, "/")
+    create_login_profile    = optional(bool, false)
+    password_reset_required = optional(bool, true)
+    create_access_key       = optional(bool, false)
+    access_key_status       = optional(string, "Active")
+    tags                    = optional(map(string), {})
   }
 }
 ```
 
----
+### Role Object Structure
 
-## 📊 Inputs
+```hcl
+roles = {
+  "role_name" = {
+    assume_role_policy = string          # Required
+    description        = optional(string, null)
+    path               = optional(string, "/")
+    tags               = optional(map(string), {})
+  }
+}
+```
 
-| Name       | Description                   | Type     | Default | Required |
-| ---------- | ----------------------------- | -------- | ------- | -------- |
-| iam_config | Unified IAM configuration map | map(any) | `{}`    | No       |
+### Policy Object Structure
+
+```hcl
+policies = {
+  "policy_name" = {
+    policy_document = string             # Required (JSON)
+    description     = optional(string, null)
+    path            = optional(string, "/")
+    tags            = optional(map(string), {})
+  }
+}
+```
+
+### Group Object Structure
+
+```hcl
+groups = {
+  "group_name" = {
+    path = optional(string, "/")
+    tags = optional(map(string), {})
+  }
+}
+```
 
 ---
 
 ## 📤 Outputs
 
-| Name     | Description                 |
-| -------- | --------------------------- |
-| roles    | Map of created IAM roles    |
-| users    | Map of created IAM users    |
-| policies | Map of created IAM policies |
+| Name | Type | Description |
+|------|------|-------------|
+| `users` | `map` | Map of created users with ARNs and unique IDs |
+| `roles` | `map` | Map of created roles with ARNs and IDs |
+| `policies` | `map` | Map of created policies with ARNs and IDs |
+| `groups` | `map` | Map of created groups with ARNs and IDs |
+| `access_keys` | `map` | Access keys for users (sensitive) |
 
 ---
 
-## 🧠 Design Principles
+## 💡 Usage Patterns
 
-* **Single Entry Point**
-  All IAM resources are managed through `iam_config`.
+### Pattern 1: Multiple Users
 
-* **Separation of Concerns**
-  Each resource type is handled by its own module.
+```hcl
+module "iam" {
+  source = "./modules/iam"
+  
+  users = {
+    "dev-1" = { create_access_key = true }
+    "dev-2" = { create_access_key = true }
+  }
+}
+```
 
-* **Dynamic Infrastructure**
-  Uses `for_each` and `try()` for flexibility.
+### Pattern 2: Multiple Roles with Assume Policy
 
-* **No Forced Inputs**
-  Only required fields must be provided.
+```hcl
+module "iam" {
+  source = "./modules/iam"
+  
+  roles = {
+    "ec2-role" = {
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Principal = { Service = "ec2.amazonaws.com" }
+          Action = "sts:AssumeRole"
+        }]
+      })
+    }
+    "lambda-role" = {
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Principal = { Service = "lambda.amazonaws.com" }
+          Action = "sts:AssumeRole"
+        }]
+      })
+    }
+  }
+}
+```
 
-* **Clean Root Module**
-  No conditional clutter in root.
+### Pattern 3: Multiple Policies
+
+```hcl
+module "iam" {
+  source = "./modules/iam"
+  
+  policies = {
+    "s3-read" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["s3:GetObject", "s3:ListBucket"]
+          Resource = "*"
+        }]
+      })
+    }
+    "s3-write" = {
+      policy_document = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Effect = "Allow"
+          Action = ["s3:PutObject"]
+          Resource = "*"
+        }]
+      })
+    }
+  }
+}
+```
+
+### Pattern 4: Policy Attachments
+
+```hcl
+module "iam" {
+  source = "./modules/iam"
+  
+  policy_attachments = [
+    "role:app-role:${aws_iam_policy.s3_read.arn}",
+    "role:app-role:${aws_iam_policy.ec2_read.arn}",
+    "user:dev-1:${aws_iam_policy.s3_read.arn}",
+    "user:dev-2:${aws_iam_policy.s3_write.arn}",
+  ]
+}
+```
+
+### Pattern 5: Groups and Memberships
+
+```hcl
+module "iam" {
+  source = "./modules/iam"
+  
+  groups = {
+    "developers" = {
+      path = "/development/"
+    }
+    "admins" = {
+      path = "/admin/"
+    }
+  }
+  
+  group_memberships = [
+    "developers:dev-1",
+    "developers:dev-2",
+    "admins:admin-user",
+  ]
+}
+```
 
 ---
 
@@ -167,83 +356,97 @@ iam_config = {
 
 ```
 .
-├── main.tf
-├── variables.tf
-├── providers.tf
-├── outputs.tf
+├── versions.tf              # AWS provider >= 5.0
+├── variables.tf             # Input variables (multi-resource)
+├── main.tf                  # Wrapper that calls internal module
+├── outputs.tf               # Root outputs
 ├── modules/
-│   ├── role-module/
-│   ├── user-module/
-│   ├── policy-module/
-│   └── attachment-module/
+│   └── iam/                 # Internal module with resource logic
+│       ├── versions.tf
+│       ├── variables.tf     # Same input variables
+│       ├── main.tf          # AWS resources (for_each based)
+│       └── outputs.tf       # Output maps
 └── example/
+    └── main.tf              # Comprehensive multi-resource example
 ```
 
 ---
 
-## 🧪 Example
+## 🔄 How It Works
 
-See the complete working example in:
+### Multi-Resource Pattern
 
+The internal module uses `for_each` to create multiple resources dynamically:
+
+```hcl
+# modules/iam/main.tf
+
+# Create multiple roles
+resource "aws_iam_role" "this" {
+  for_each = var.roles
+  
+  name               = each.key
+  assume_role_policy = each.value.assume_role_policy
+  # ...
+}
+
+# Create multiple users
+resource "aws_iam_user" "this" {
+  for_each = var.users
+  
+  name = each.key
+  # ...
+}
+
+# Create multiple policies
+resource "aws_iam_policy" "this" {
+  for_each = var.policies
+  
+  name   = each.key
+  policy = each.value.policy_document
+  # ...
+}
+
+# Attach policies dynamically
+resource "aws_iam_role_policy_attachment" "this" {
+  for_each = local.role_policy_attachments
+  
+  role       = each.value.role
+  policy_arn = each.value.policy_arn
+}
 ```
-example/
+
+---
+
+## 🔐 Security Best Practices
+
+* **Access Keys**: Returned as sensitive outputs. Store securely in AWS Secrets Manager
+* **Login Profiles**: Rotate passwords regularly
+* **Policies**: Use least-privilege principle
+* **Paths**: Use paths (`/service/`, `/team/`) to organize resources
+* **Tags**: Use tags for tracking and cost allocation
+* **Policy Attachments**: Verify ARNs before attaching
+
+---
+
+## 🧪 Running Examples
+
+```bash
+cd example
+terraform init
+terraform plan
+terraform apply
+terraform destroy
 ```
 
 ---
 
-## 🔐 Security Notes
+## 📝 License
 
-* Access keys are sensitive and only returned once.
-
-* Store secrets securely using:
-
-  * AWS Secrets Manager
-  * HashiCorp Vault
-
-* Avoid committing secrets to version control.
+This module is provided as-is for educational and production use.
 
 ---
 
-## ⚠️ Limitations
+## 🤝 Contributing
 
-* IAM is a global service (not region-specific).
-* Inline policies are not handled separately.
-* Policy attachment assumes valid ARNs.
-
----
-
-## 🧰 Requirements
-
-| Name      | Version |
-| --------- | ------- |
-| Terraform | >= 1.3  |
-| AWS       | >= 4.0  |
-
----
-
-## 🔄 Future Enhancements
-
-* OIDC Role Support (GitHub/GitLab CI)
-* Instance Profiles
-* Inline Policy Support
-* Advanced Validation Layer
-
----
-
-## ✨ Author
-
-**Aadityasinh Zala**
-
----
-
-
-## ⭐ Contributing
-
-Contributions, issues, and feature requests are welcome!
-Feel free to open a PR or raise an issue.
-
----
-
-## 💡 Final Note
-
-This module is designed to act as a **lightweight IAM abstraction layer**, making it easy to manage complex IAM configurations in a clean and scalable way.
+Contributions and feedback are welcome!
