@@ -153,9 +153,6 @@ output "groups" {
 ---
 
 ## ⚙️ Input Variables
-```
-
-## ⚙️ Input Variables
 
 ### Multi-Resource Variables
 
