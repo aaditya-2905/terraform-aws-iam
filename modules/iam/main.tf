@@ -72,7 +72,7 @@ locals {
     for idx, parts in local.policy_attachment_list :
     "role_${idx}" => {
       role       = parts[1]
-      policy_arn = parts[2]
+      policy_arn = join(":", slice(parts, 2, length(parts)))
     }
     if parts[0] == "role"
   }
@@ -82,7 +82,7 @@ locals {
     for idx, parts in local.policy_attachment_list :
     "user_${idx}" => {
       user       = parts[1]
-      policy_arn = parts[2]
+      policy_arn = join(":", slice(parts, 2, length(parts)))
     }
     if parts[0] == "user"
   }
