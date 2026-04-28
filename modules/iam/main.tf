@@ -105,7 +105,7 @@ locals {
 resource "aws_iam_role_policy_attachment" "this" {
   for_each = local.role_policy_attachments
 
-  role       = each.value.role
+  role       = contains(keys(aws_iam_role.this), each.value.role) ? aws_iam_role.this[each.value.role].name : each.value.role
   policy_arn = each.value.policy_arn
 }
 
